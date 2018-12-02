@@ -1,4 +1,5 @@
-import BN from 'bn.js';
+// @flow
+
 import { createActions, handleActions } from 'redux-actions';
 import Web3 from 'web3';
 

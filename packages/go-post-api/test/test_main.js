@@ -25,7 +25,7 @@ contract('MainContract', accounts => {
     it('should make basic post', async () => {
       await instance.methods.makePost('Test message').send({ from: accounts[0], gas: 1e7 });
       const userPosts = await instance.methods.getPostIdsByUser(accounts[0]).call();
-      assert.deepEqual(userPosts, ['0']);
+      assert.deepEqual(userPosts, ['1']);
       const post = await instance.methods.postById(userPosts[0]).call();
       assert.equal(post.content, 'Test message');
     });
@@ -36,7 +36,7 @@ contract('MainContract', accounts => {
       }
 
       const userPosts = await instance.methods.getPostIdsByUser(accounts[0]).call();
-      assert.deepEqual(userPosts, ['0', '1']);
+      assert.deepEqual(userPosts, ['1', '2']);
     });
   });
 
@@ -90,6 +90,75 @@ contract('MainContract', accounts => {
       } catch (err) {
         assert(err.message.toLowerCase().includes('invalid username'));
       }
+    });
+  });
+
+  describe('likes', () => {
+    let poster = null;
+    let postId = null;
+
+    beforeEach(async () => {
+      poster = accounts[0];
+      const postResult = await instance.methods.makePost('Test').send({ from: poster, gas: 1e7 });
+      postId = postResult.events.NewPost.returnValues.post.id;
+    });
+
+    it('should like post', async () => {
+      await instance.methods.setUsername('test').send({ from: accounts[1], gas: 1e7 });
+      const result = await instance.methods.likePost(postId).send({ from: accounts[1], gas: 1e7 });
+      const event = result.events.PostLiked;
+      assert.exists(event);
+
+      const userLikes = await instance.methods.getLikesByUser(accounts[1]).call();
+      assert.deepEqual(userLikes, [postId], 'getLikesByUser');
+
+      const likeUsers = await instance.methods.getPostLikeUsernames(postId).call();
+      assert.deepEqual(likeUsers, ['test'], 'getPostLikeUsernames');
+    });
+
+    it('should unlike post', async () => {
+      await instance.methods.setUsername('test').send({ from: accounts[1], gas: 1e7 });
+      await instance.methods.likePost(postId).send({ from: accounts[1], gas: 1e7 });
+      const result = await instance.methods.unlikePost(postId).send({ from: accounts[1], gas: 1e7 });
+      const event = result.events.PostUnliked;
+      assert.exists(event);
+
+      const userLikes = await instance.methods.getLikesByUser(accounts[1]).call();
+      assert.deepEqual(userLikes, [], 'getLikesByUser');
+
+      const likeUsers = await instance.methods.getPostLikeUsernames(postId).call();
+      assert.deepEqual(likeUsers, [], 'getPostLikeUsernames');
+    });
+  });
+
+  describe('tips', () => {
+    let poster = null;
+    let postId = null;
+
+    beforeEach(async () => {
+      poster = accounts[0];
+      const postResult = await instance.methods.makePost('Test').send({ from: poster, gas: 1e7 });
+      postId = postResult.events.NewPost.returnValues.post.id;
+    });
+
+    it('should tip post', async () => {
+      await instance.methods.setUsername('test').send({ from: accounts[1], gas: 1e7 });
+      const balanceBefore = web3.utils.toBN(await web3.eth.getBalance(accounts[0]));
+
+      const tipAmount = new BN('10').pow(new BN('17'));
+      const result = await instance.methods.tipPost(postId).send({ value: tipAmount, from: accounts[1], gas: 1e7 });
+      const event = result.events.PostTipped;
+      assert.exists(event);
+
+      const values = event.returnValues;
+      assert.equal(values.fromUser.toLowerCase(), accounts[1].toLowerCase());
+      assert.equal(values.toUser.toLowerCase(), accounts[0].toLowerCase());
+      assert.equal(values.forPost, postId);
+
+      const balanceAfter = web3.utils.toBN(await web3.eth.getBalance(accounts[0]));
+      const balanceChange = balanceAfter.sub(balanceBefore);
+      assert(web3.utils.toBN(event.returnValues.amount).eq(tipAmount), 'PostTipped event has correct amount.');
+      assert(balanceChange.eq(tipAmount), 'Tip amount was added to poster.');
     });
   });
 });

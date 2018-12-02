@@ -1,12 +1,26 @@
 pragma solidity ^0.4.24;
 pragma experimental ABIEncoderV2;
 
+import {AddressToString} from "./AddressToString.sol";
+import {Miniwallet} from "./Miniwallet.sol";
+
 contract MainContract {
+    using AddressToString for address;
+
+    event NewMiniwallet(address user, address wallet);
+
     event NewPost(address user, Post post);
 
     event UsernameInUse(address by);
     event UsernameSet(address user, string username);
     event UsernameUnset(address user, string username);
+
+    event PostLiked(address liker, uint postId);
+    event PostUnliked(address liker, uint postId);
+
+    event PostTipped(address fromUser, address toUser, uint forPost, uint amount);
+
+    mapping(address => address) public miniwalletByUser;
 
     struct Post {
         uint id;
@@ -15,7 +29,7 @@ contract MainContract {
         string content;
     }
 
-    uint nextPostId = 0;
+    uint nextPostId = 1;
     mapping(uint => Post) public postById;
 
     mapping(address => uint[]) public postIdsByUser;
@@ -26,7 +40,30 @@ contract MainContract {
     // Uses explicit getter due to Solidity limitations.
     mapping(string => address) internal userByUsername;
 
-    constructor() public {
+    mapping(uint => address[]) public likesByPostId;
+    mapping(address => uint[]) public likesByUser;
+
+    mapping(uint => Tip[]) public tipsByPostId;
+    mapping(address => Tip[]) public tipsByUser;
+
+    struct Tip {
+        address fromUser;
+        address toUser;
+        uint forPost;
+        uint amount;
+    }
+
+    constructor() public {}
+
+    function makeMiniwallet() public payable {
+        address user = msg.sender;
+
+        address[] memory owners = new address[](1);
+        owners[0] = user;
+
+        Miniwallet wallet = new Miniwallet(owners);
+        miniwalletByUser[user] = wallet;
+        emit NewMiniwallet(user, wallet);
     }
 
     function makePost(string _content) public {
@@ -45,12 +82,7 @@ contract MainContract {
         emit NewPost(user, post);
     }
 
-    function getPostIdsByUser(address user) public view returns (uint[]) {
-        return postIdsByUser[user];
-    }
-
-    function getPostsByUser(address user) public view returns (Post[]) {
-        uint[] memory postIds = postIdsByUser[user];
+    function getPostsFromIds(uint[] postIds) public view returns (Post[]) {
         Post[] memory posts = new Post[](postIds.length);
 
         for (uint i = 0; i < postIds.length; i++) {
@@ -59,6 +91,14 @@ contract MainContract {
         }
 
         return posts;
+    }
+
+    function getPostIdsByUser(address user) public view returns (uint[]) {
+        return postIdsByUser[user];
+    }
+
+    function getPostsByUser(address user) public view returns (Post[]) {
+        return getPostsFromIds(postIdsByUser[user]);
     }
 
     function makePostId() public returns (uint) {
@@ -120,5 +160,115 @@ contract MainContract {
 
     function getUserByUsername(string username) public view returns (address) {
         return userByUsername[username];
+    }
+
+    function getUsernamesFromUsers(address[] users) public view returns (string[]) {
+        string[] memory usernames = new string[](users.length);
+
+        for (uint i = 0; i < users.length; i++) {
+            address user = users[i];
+            string memory username = usernameByUser[user];
+
+            if (bytes(username).length == 0) {
+                // TODO: Fall back to address? Address to string conversion seems broken.
+                usernames[i] = "";
+            } else {
+                usernames[i] = username;
+            }
+        }
+
+        return usernames;
+    }
+
+    function likePost(uint postId) public {
+        require(postById[postId].id != 0, "Post does not exist.");
+
+        address user = msg.sender;
+        uint[] memory likedPosts = likesByUser[user];
+
+        for (uint i = 0; i < likedPosts.length; i++) {
+            if (likedPosts[i] == postId) {
+                return;
+            }
+        }
+
+        likesByUser[user].push(postId);
+        likesByPostId[postId].push(user);
+        emit PostLiked(user, postId);
+    }
+
+    function unlikePost(uint postId) public {
+        require(postById[postId].id != 0, "Post does not exist.");
+
+        address user = msg.sender;
+        address[] memory postLikes = likesByPostId[postId];
+
+        for (uint i = 0; i < postLikes.length; i++) {
+            if (postLikes[i] == user) {
+                likesByPostId[postId][i] = postLikes[postLikes.length - 1];
+                delete likesByPostId[postId][postLikes.length - 1];
+                likesByPostId[postId].length--;
+                break;
+            }
+        }
+
+        uint[] memory likedPosts = likesByUser[user];
+
+        for (uint j = 0; j < likedPosts.length; j++) {
+            if (likedPosts[j] == postId) {
+                likesByUser[user][j] = likedPosts[likedPosts.length - 1];
+                delete likesByUser[user][likedPosts.length - 1];
+                likesByUser[user].length--;
+                break;
+            }
+        }
+
+        emit PostUnliked(user, postId);
+    }
+
+    function getLikesByPostId(uint postId) public view returns (address[]) {
+        return likesByPostId[postId];
+    }
+
+    function getLikesByUser(address user) public view returns (uint[]) {
+        return likesByUser[user];
+    }
+
+    function getPostLikeUsernames(uint postId) public view returns (string[]) {
+        return getUsernamesFromUsers(likesByPostId[postId]);
+    }
+
+    uint public tipMinimumAmount = 0.1 ether;
+
+    function tipPost(uint postId) public payable {
+        Post memory post = postById[postId];
+        require(post.id != 0, "Post does not exist.");
+
+        address fromUser = msg.sender;
+        address toUser = post.user;
+
+        require(msg.value >= tipMinimumAmount, "Tip amount too small.");
+
+        Tip memory tip = Tip({
+            fromUser: fromUser,
+            toUser: toUser,
+            forPost: postId,
+            amount: msg.value
+        });
+
+        tipsByPostId[postId].push(tip);
+        tipsByUser[fromUser].push(tip);
+
+        toUser.transfer(msg.value);
+
+        emit PostTipped(fromUser, toUser, postId, msg.value);
+    }
+
+    function getTipsByPostId(uint postId) public view returns (Tip[]) {
+        return tipsByPostId[postId];
+    }
+
+    function getTipsByUser(address user) public view returns (Tip[]) {
+        return tipsByUser[user];
     }
 }

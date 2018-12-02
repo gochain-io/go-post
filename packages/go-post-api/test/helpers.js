@@ -6,4 +6,4 @@ const getWeb3 = () => {
   return newWeb3;
 }
 
-module.exports = { getWeb3, getContractInstance };
+module.exports = { getWeb3 };

@@ -1,6 +1,10 @@
 import MainContract from './build/contracts/MainContract';
+import Miniwallet from './build/contracts/Miniwallet';
 
-export { MainContract as MainContractArtifact };
+export {
+  MainContract as MainContractArtifact,
+  Miniwallet as MiniwalletArtifact,
+};
 
 const getDeployedContract = artifact => (web3, networkId) => {
   const deployedAddress = artifact.networks[networkId].address;

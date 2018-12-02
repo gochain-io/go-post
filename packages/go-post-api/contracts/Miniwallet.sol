@@ -7,7 +7,7 @@ contract Miniwallet {
 
     address[] public owners;
 
-    constructor(address[] initialOwners) public {
+    constructor(address[] initialOwners) public payable {
         owners = initialOwners;
     }
 
@@ -32,7 +32,7 @@ contract Miniwallet {
         }
     }
 
-    function addOwner(address account) public onlyOwner {
+    function addOwner(address account) public payable onlyOwner {
         if (isOwner(account)) {
             return;
         }
@@ -45,6 +45,17 @@ contract Miniwallet {
         for (uint i = 0; i < accounts.length; i++) {
             addOwner(accounts[i]);
         }
+    }
+
+    function getOwners() public view returns (address[]) {
+        return owners;
+    }
+
+    function recharge(address account, uint amountForAccount) public payable onlyOwner {
+        require(amountForAccount <= msg.value, "amountForAccount <= msg.value");
+
+        addOwner(account);
+        account.transfer(amountForAccount);
     }
 
     function withdraw(address to, uint amount) public onlyOwner {

@@ -1,10 +1,22 @@
+// @flow
+
 import { createActions, handleActions } from 'redux-actions';
 import Web3 from 'web3';
 
 import { getMainContract } from 'go-post-api';
 
+import { initMiniwallet } from './miniwallet';
+
+const errorType = {
+  NETWORK: 'network',
+  NO_METAMASK: 'no_metamask',
+  METAMASK_LOCKED: 'metamask_locked',
+  DISCONNECTED: 'disconnected'
+};
+
 const defaultState = {
   isConnected: false,
+  errorType: null,
   error: null,
   web3: null,
   networkId: null,
@@ -12,12 +24,14 @@ const defaultState = {
   contracts: {
     main: null,
   },
+  lastBlockTime: new Date(),
 };
 
-const { connected, fail, setMainContract } = createActions({
+const { connected, web3Error, setMainContract, setLastBlockTime } = createActions({
   CONNECTED: (web3, networkId, account) => ({ web3, networkId, account }),
-  FAIL: (error) => ({ error }),
+  WEB3_ERROR: (errorType, error) => ({ errorType, error }),
   SET_MAIN_CONTRACT: (contract) => ({ contract }),
+  SET_LAST_BLOCK_TIME: (lastBlockTime) => ({ lastBlockTime }),
 }, { prefix: 'app/contracts' });
 
 const web3 = new Web3();
@@ -31,21 +45,51 @@ export const init = () => async dispatch => {
       networkId = await web3.eth.net.getId();
     }
 
-    if (networkId === null) {
+    if (!networkId) {
       web3.setProvider('ws://localhost:8545');
       networkId = await web3.eth.net.getId();
     }
 
-    const [account] = await web3.eth.getAccounts();
-    if (!account) {
-      throw new Error('MetaMask locked');
+    if (!networkId) {
+      dispatch(web3Error(new Error('Could not connect to web3 provider.'), errorType.NETWORK));
+      return;
     }
+
+    const [account] = await web3.eth.getAccounts();
+
+    setInterval(async () => {
+      const accounts = await web3.eth.getAccounts();
+      if (accounts[0] !== account) {
+        window.location.reload();
+        return;
+      }
+
+      const id = await web3.eth.net.getId();
+      if (id !== networkId) {
+        window.location.reload();
+      }
+    }, 1000);
+
+    if (!account) {
+      dispatch(web3Error(new Error('MetaMask locked'), errorType.METAMASK_LOCKED));
+      return;
+    }
+
+    web3.eth.subscribe('newBlockHeaders', (e) => {
+      if (e) {
+        console.error('newBlockHeaders error', e);
+        dispatch(web3Error(e, errorType.DISCONNECTED));
+      } else {
+        dispatch(setLastBlockTime(new Date()));
+      }
+    });
 
     dispatch(setMainContract(await getMainContract(web3, networkId)));
 
     dispatch(connected(web3, networkId, account));
+    await dispatch(initMiniwallet());
   } catch (e) {
-    dispatch(fail(e));
+    dispatch(web3Error(e, errorType.NETWORK));
   }
 }
 
@@ -58,8 +102,9 @@ const reducer = handleActions(
       networkId,
       account
     }),
-    [fail]: (state, { payload: { error } }) => ({
+    [web3Error]: (state, { payload: { errorType, error } }) => ({
       ...defaultState,
+      errorType,
       error
     }),
     [setMainContract]: (state, { payload: { contract } }) => ({
@@ -68,6 +113,10 @@ const reducer = handleActions(
         ...state.contracts,
         main: contract
       }
+    }),
+    [setLastBlockTime]: (state, { payload: { lastBlockTime } }) => ({
+      ...state,
+      lastBlockTime
     }),
   },
   defaultState
