@@ -100,7 +100,7 @@ export const makePost = (content) => async (dispatch, getState) => {
   try {
     dispatch(setIsPosting(true));
     const result = await dispatch(sendTransaction(main.methods.makePost(account, content), { gas: 3e6 }));
-    // Shows up when the NewPost listener sees it.
+    dispatch(addPost(processNewPost(result.events.NewPost.returnValues.post)));
   } catch(e) {
     console.error('error saving post', e);
   } finally {
@@ -201,7 +201,20 @@ export const tip = (postId, amount) => async (dispatch, getState) => {
   }
 };
 
-const sortPosts = posts => posts.concat().sort((p1, p2) => p2.post.time - p1.post.time);
+const formatPosts = posts => {
+  const usedIds = {};
+  let newPosts = [];
+  posts.forEach(post => {
+    const id = post.post.id;
+    if (!usedIds[id]) {
+      usedIds[id] = true;
+      newPosts.push(post);
+    }
+  });
+
+  newPosts.sort((p1, p2) => p2.post.time - p1.post.time);
+  return newPosts;
+};
 
 const ensureLike = (likes, account, liked) => {
   if (liked) {
@@ -222,11 +235,11 @@ const reducer = handleActions(
       isFetched: true,
       user,
       userAddress,
-      posts: posts ? sortPosts(posts) : null,
+      posts: posts ? formatPosts(posts) : null,
     }),
     [addPost]: (state, { payload: { post } }) => ({
       ...state,
-      posts: sortPosts([...state.posts, post]),
+      posts: formatPosts([...state.posts, post]),
     }),
     [fail]: (state, { payload: { error } }) => ({ ...defaultState, error }),
     [setLikePending]: (state, { payload: { postId, likePending } }) => ({

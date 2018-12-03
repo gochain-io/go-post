@@ -47,13 +47,16 @@ export const initContracts = () => async dispatch => {
     if (typeof window.web3 !== 'undefined') { // MetaMask
       web3.setProvider(window.web3.currentProvider);
       networkId = await web3.eth.net.getId();
-    } else if (process.env.NODE_ENV !== 'development') {
-      // No MetaMask, not developing.
-      dispatch(web3Error(errorType.NO_METAMASK, new Error('No MetaMask')));
-      return;
     } else {
-      web3.setProvider('ws://localhost:8545');
-      networkId = await web3.eth.net.getId();
+      if (process.env.NODE_ENV !== 'development') {
+        // In development, fall back to ganache-cli.
+        web3.setProvider('ws://localhost:8545');
+        networkId = await web3.eth.net.getId();
+      } else {
+        // No MetaMask, not developing.
+        dispatch(web3Error(errorType.NO_METAMASK, new Error('No MetaMask')));
+        return;
+      }
     }
 
     if (!networkId) {
@@ -109,21 +112,11 @@ export const initContracts = () => async dispatch => {
 
         if (lastBlockNum !== res) {
           lastBlockNum = res;
-          console.log('new Block', new Date() / 1000, res);
+          console.log('new block', res);
           dispatch(setLastBlockTime(new Date()));
         }
       });
     }, 1000);
-
-    // web3.eth.subscribe('newBlockHeaders', (e) => {
-    //   if (e) {
-    //     console.error('newBlockHeaders error', e);
-    //     dispatch(web3Error(errorType.DISCONNECTED, e));
-    //   } else {
-    //     console.log('new Block', new Date() / 1000);
-    //     dispatch(setLastBlockTime(new Date()));
-    //   }
-    // });
 
     dispatch(setMainContract(await getMainContract(web3, networkId)));
 

@@ -62,7 +62,7 @@ class MetaMaskPrompt extends Component {
           <Typography component="h1" variant="h5" className={classes.title}>
             {title}
           </Typography>
-          <Typography variant="body2Next" color="inherit" paragraph className={classes.subtitle}>
+          <Typography variant="body2" color="inherit" paragraph className={classes.subtitle}>
             {subtitle}
           </Typography>
         </Paper>

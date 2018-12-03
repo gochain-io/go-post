@@ -8,7 +8,7 @@ const walletBalanceRecommended = new BN(10).pow(new BN(18)).mul(new BN(3));
 const walletBalanceLow = new BN(10).pow(new BN(18));
 const accountBalanceRecommended = new BN(10).pow(new BN(17));
 // Must be more than the greatest amount required by a miniwallet transaction.
-const accountBalanceLow = new BN(10).pow(new BN(17));
+const accountBalanceLow = new BN(10).pow(new BN(16).mul(new BN(4)));
 const accountBalanceVeryLow = new BN(10).pow(new BN(16));
 
 const defaultState = {
@@ -193,9 +193,9 @@ export const getShouldRecharge = (state) => {
   return !contract || cachedWalletBalance.lt(walletBalanceLow) || cachedAccountBalance.lt(accountBalanceVeryLow);
 }
 
-const getIsAccountBalanceLow = (state) => {
-  const balance = state.miniwallet.cachedAccountBalance;
-  return balance.lt(accountBalanceLow);
+const getIsWalletBalanceLow = (state) => {
+  const balance = state.miniwallet.cachedWalletBalance;
+  return !state.miniwallet.account || balance.lt(walletBalanceLow);
 };
 
 export const hideMiniwalletPrompt = () => async (dispatch) => {
@@ -236,7 +236,7 @@ const flushPendingTransactions = () => async (dispatch, getState) => {
         return;
       }
 
-      if (getIsAccountBalanceLow(getState())) {
+      if (getIsWalletBalanceLow(getState())) {
         dispatch(setPromptVisible(true));
         return;
       }
@@ -290,12 +290,7 @@ export const sendMiddleware = store => next => action => {
 
         return new Promise(async (resolve, reject) => {
           try {
-            const wasEmpty = store.getState().miniwallet.pendingTransactions.length === 0;
             store.dispatch(addPendingTransaction(transactionObject, sendOptions, resolve, reject));
-            if (!wasEmpty) {
-              // Another call is already flushing the transactions.
-              return;
-            }
 
             const {
               isFlushingTransactions,
