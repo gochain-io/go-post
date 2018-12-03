@@ -7,10 +7,13 @@
   "scripts": {
     "ganache-cli": "node_modules/.bin/ganache-cli -m 'quarter amazing fetch shove salute seminar injury vivid awful area street surge' --gasLimit 136500000",
     "migrate:local": "truffle migrate --network=development --reset --all",
+    "migrate:test": "truffle migrate --network=test --reset --all",
+    "migrate:main": "truffle migrate --network=main --reset --all",
     "test": "scripts/test.sh test"
   },
   "devDependencies": {
     "truffle": "^4.1.14",
+    "truffle-hdwallet-provider": "0.0.6",
     "web3": "1.0.0-beta.36"
   },
   "dependencies": {

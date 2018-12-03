@@ -3,11 +3,13 @@ import { createActions, handleActions } from 'redux-actions';
 
 import { MiniwalletArtifact } from 'go-post-api';
 
-const walletBalanceRecommended = new BN(10).pow(new BN(18));
-const walletBalanceLow = new BN(10).pow(new BN(17));
-const accountBalanceRecommended = new BN(10).pow(new BN(16));
-const accountBalanceLow = new BN(10).pow(new BN(15));
-const accountBalanceVeryLow = new BN(10).pow(new BN(14));
+// These numbers aren't particularly fined-tuned.
+const walletBalanceRecommended = new BN(10).pow(new BN(18)).mul(new BN(3));
+const walletBalanceLow = new BN(10).pow(new BN(18));
+const accountBalanceRecommended = new BN(10).pow(new BN(17));
+// Must be more than the greatest amount required by a miniwallet transaction.
+const accountBalanceLow = new BN(10).pow(new BN(17));
+const accountBalanceVeryLow = new BN(10).pow(new BN(16));
 
 const defaultState = {
   isReady: false,
@@ -16,6 +18,8 @@ const defaultState = {
   account: null,
   cachedAccountBalance: new BN(0),
   pendingTransactions: [],
+  isFlushingTransactions: false,
+  isPromptVisible: false,
 };
 
 const {
@@ -25,7 +29,9 @@ const {
   setAccountBalance,
   addPendingTransaction,
   popPendingTransaction,
-  sendTransaction
+  sendTransaction,
+  setFlushingTransactions,
+  setPromptVisible,
 } = createActions({
   UPDATE_CONTRACT: (contract, cachedWalletBalance) => ({ contract, cachedWalletBalance }),
   SET_WALLET_BALANCE: (cachedWalletBalance) => ({ cachedWalletBalance }),
@@ -42,6 +48,8 @@ const {
     transactionObject,
     sendOptions
   }),
+  SET_FLUSHING_TRANSACTIONS: (isFlushingTransactions) => ({ isFlushingTransactions }),
+  SET_PROMPT_VISIBLE: (isPromptVisible) => ({ isPromptVisible }),
 }, { prefix: 'app/miniwallet' });
 export { sendTransaction };
 
@@ -104,8 +112,11 @@ export const recharge = () => async (dispatch, getState) => {
     });
 
     await dispatch(refreshContract(contract));
+
+    return null;
   } catch (e) {
     console.error('recharge error', e);
+    return e;
   }
 }
 
@@ -182,6 +193,83 @@ export const getShouldRecharge = (state) => {
   return !contract || cachedWalletBalance.lt(walletBalanceLow) || cachedAccountBalance.lt(accountBalanceVeryLow);
 }
 
+const getIsAccountBalanceLow = (state) => {
+  const balance = state.miniwallet.cachedAccountBalance;
+  return balance.lt(accountBalanceLow);
+};
+
+export const hideMiniwalletPrompt = () => async (dispatch) => {
+  dispatch(setPromptVisible(false));
+  const err = await dispatch(recharge());
+  if (err !== null) {
+    await dispatch(cancelPendingTransactions(err));
+    return;
+  }
+
+  await dispatch(flushPendingTransactions());
+}
+
+const cancelPendingTransactions = (err) => async (dispatch, getState) => {
+  let pending = null;
+  while (true) {
+    pending = getState().miniwallet.pendingTransactions;
+    if (pending.length === 0) {
+      return;
+    }
+    const { reject } = pending[0];
+    dispatch(popPendingTransaction());
+    reject(err);
+  }
+}
+
+const flushPendingTransactions = () => async (dispatch, getState) => {
+  const { web3 } = getState().contracts;
+
+  dispatch(setFlushingTransactions(true));
+
+  try {
+    let pending = null;
+    while (true) {
+      pending = getState().miniwallet.pendingTransactions;
+      if (pending.length === 0) {
+        dispatch(setFlushingTransactions(false));
+        return;
+      }
+
+      if (getIsAccountBalanceLow(getState())) {
+        dispatch(setPromptVisible(true));
+        return;
+      }
+
+      const { transactionObject, sendOptions, resolve, reject } = pending[0];
+      dispatch(popPendingTransaction());
+      await dispatch(ensureBuffer());
+
+      try {
+        const result = await transactionObject.send(sendOptions);
+
+        const { account, contract } = getState().miniwallet;
+        const [walletBalance, accountBalance] = (await Promise.all([
+          web3.eth.getBalance(contract.options.address),
+          web3.eth.getBalance(account),
+        ])).map(num => web3.utils.toBN(num));
+        dispatch(setWalletBalance(walletBalance));
+        dispatch(setAccountBalance(accountBalance));
+
+        resolve(result);
+      } catch (e) {
+        reject(e);
+      } finally {
+        dispatch(setFlushingTransactions(false));
+      }
+    }
+  } catch (e) {
+    console.error('transaction flush error', e);
+  }
+
+  dispatch(setFlushingTransactions(false));
+}
+
 export const sendMiddleware = store => next => action => {
   if (typeof action.type !== 'string' || !action.type.startsWith('app/miniwallet/')) {
     return next(action);
@@ -190,52 +278,34 @@ export const sendMiddleware = store => next => action => {
   switch (action.type) {
     case 'app/miniwallet/SEND_TRANSACTION':
       return (async () => {
-        const { web3 } = store.getState().contracts;
+        const { web3, account: parentAccount } = store.getState().contracts;
         const state = store.getState().miniwallet;
 
         const { transactionObject } = action.payload;
+        const childAccount = ensureChildAccount(web3, parentAccount);
         const sendOptions = {
           ...action.payload.sendOptions,
-          from: state.account,
+          from: childAccount.address,
         };
 
         return new Promise(async (resolve, reject) => {
           try {
             const wasEmpty = store.getState().miniwallet.pendingTransactions.length === 0;
-
             store.dispatch(addPendingTransaction(transactionObject, sendOptions, resolve, reject));
-
             if (!wasEmpty) {
+              // Another call is already flushing the transactions.
               return;
             }
 
-            let pending = null;
-            while (true) {
-              pending = store.getState().miniwallet.pendingTransactions;
-              if (pending.length === 0) {
-                return;
-              }
+            const {
+              isFlushingTransactions,
+            } = store.getState().miniwallet;
 
-              const { transactionObject, sendOptions, resolve, reject } = pending[0];
-              store.dispatch(popPendingTransaction());
-
-              await store.dispatch(ensureBuffer());
-
-              try {
-                const result = await transactionObject.send(sendOptions);
-
-                const [walletBalance, accountBalance] = (await Promise.all([
-                  web3.eth.getBalance(state.contract.options.address),
-                  web3.eth.getBalance(state.account),
-                ])).map(num => web3.utils.toBN(num));
-                store.dispatch(setWalletBalance(walletBalance));
-                store.dispatch(setAccountBalance(accountBalance));
-
-                resolve(result);
-              } catch (e) {
-                reject(e);
-              }
+            if (isFlushingTransactions) {
+              return;
             }
+
+            await store.dispatch(flushPendingTransactions());
           } catch (e) {
             reject(e);
           }
@@ -270,6 +340,8 @@ const reducer = handleActions(
         ...state.pendingTransactions.slice(1),
       ],
     }),
+    [setFlushingTransactions]: (state, { payload: { isFlushingTransactions } }) => ({ ...state, isFlushingTransactions }),
+    [setPromptVisible]: (state, { payload: { isPromptVisible } }) => ({ ...state, isPromptVisible }),
   },
   defaultState
 );

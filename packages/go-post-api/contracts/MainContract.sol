@@ -9,7 +9,7 @@ contract MainContract {
 
     event NewMiniwallet(address user, address wallet);
 
-    event NewPost(address user, Post post);
+    event NewPost(address user, PostView post);
 
     event UsernameInUse(address by);
     event UsernameSet(address user, string username);
@@ -22,11 +22,25 @@ contract MainContract {
 
     mapping(address => address) public miniwalletByUser;
 
+    struct UserView {
+        address addr;
+        string username;
+    }
+
     struct Post {
         uint id;
         address user;
         uint time;
         string content;
+    }
+
+    struct PostView {
+        uint id;
+        UserView user;
+        uint time;
+        string content;
+        UserView[] likes;
+        TipView[] tips;
     }
 
     uint nextPostId = 1;
@@ -53,6 +67,13 @@ contract MainContract {
         uint amount;
     }
 
+    struct TipView {
+        UserView fromUser;
+        UserView toUser;
+        uint forPost;
+        uint amount;
+    }
+
     constructor() public {}
 
     function makeMiniwallet() public payable {
@@ -66,8 +87,66 @@ contract MainContract {
         emit NewMiniwallet(user, wallet);
     }
 
-    function makePost(string _content) public {
-        address user = msg.sender;
+    function senderControlsUser(address user) public view returns (bool) {
+        if (user == msg.sender) {
+            return true;
+        }
+
+        address walletAddress = miniwalletByUser[user];
+        if (walletAddress == address(0)) {
+            return false;
+        }
+
+        return Miniwallet(walletAddress).isOwner(msg.sender);
+    }
+
+    modifier onlyController(address user)  {
+        require(senderControlsUser(user), "Sender does not control this user.");
+        _;
+    }
+
+    function getPostLikes(uint postId) public view returns (UserView[]) {
+        address[] memory addresses = likesByPostId[postId];
+        UserView[] memory likes = new UserView[](addresses.length);
+
+        for (uint i = 0; i < addresses.length; i++) {
+            likes[i] = getUserView(addresses[i]);
+        }
+
+        return likes;
+    }
+
+    function getPostTips(uint postId) public view returns (TipView[]) {
+        Tip[] memory tips = tipsByPostId[postId];
+        TipView[] memory tipViews = new TipView[](tips.length);
+
+        for (uint i = 0; i < tips.length; i++) {
+            tipViews[i] = tipToTipView(tips[i]);
+        }
+
+        return tipViews;
+    }
+
+    function postToPostView(Post post, bool isNew) public view returns (PostView) {
+        UserView[] memory likes;
+        TipView[] memory tips;
+
+        if (!isNew) {
+            likes = getPostLikes(post.id);
+            tips = getPostTips(post.id);
+        }
+
+        return PostView({
+            id: post.id,
+            user: getUserView(post.user),
+            time: post.time,
+            content: post.content,
+            likes: likes,
+            tips: tips
+        });
+    }
+
+    function makePost(address user, string _content) public onlyController(user) {
         uint id = makePostId();
         Post memory post = Post({
             id: id,
@@ -79,15 +158,15 @@ contract MainContract {
 
         postById[id] = post;
         postIdsByUser[user].push(id);
-        emit NewPost(user, post);
+        emit NewPost(user, postToPostView(post, true));
     }
 
-    function getPostsFromIds(uint[] postIds) public view returns (Post[]) {
-        Post[] memory posts = new Post[](postIds.length);
+    function getPostsFromIds(uint[] postIds) public view returns (PostView[]) {
+        PostView[] memory posts = new PostView[](postIds.length);
 
         for (uint i = 0; i < postIds.length; i++) {
             uint id = postIds[i];
-            posts[i] = postById[id];
+            posts[i] = postToPostView(postById[id], false);
         }
 
         return posts;
@@ -97,7 +176,7 @@ contract MainContract {
         return postIdsByUser[user];
     }
 
-    function getPostsByUser(address user) public view returns (Post[]) {
+    function getPostsByUser(address user) public view returns (PostView[]) {
         return getPostsFromIds(postIdsByUser[user]);
     }
 
@@ -137,10 +216,9 @@ contract MainContract {
         }
     }
 
-    function setUsername(string username) public {
+    function setUsername(address user, string username) public onlyController(user) {
         require(isValidUsername(username), "Invalid username.");
 
-        address user = msg.sender;
         address currentOwner = userByUsername[username];
 
         if (currentOwner != address(0) && currentOwner != user) {
@@ -154,36 +232,34 @@ contract MainContract {
         emit UsernameSet(user, username);
     }
 
-    function unsetUsername() public {
-        unsetUserUsername(msg.sender);
+    function unsetUsername(address user) public onlyController(user) {
+        unsetUserUsername(user);
     }
 
     function getUserByUsername(string username) public view returns (address) {
         return userByUsername[username];
     }
 
-    function getUsernamesFromUsers(address[] users) public view returns (string[]) {
-        string[] memory usernames = new string[](users.length);
-
-        for (uint i = 0; i < users.length; i++) {
-            address user = users[i];
-            string memory username = usernameByUser[user];
-
-            if (bytes(username).length == 0) {
-                // TODO: Fall back to address? Address to string conversion seems broken.
-                usernames[i] = "";
-            } else {
-                usernames[i] = username;
-            }
-        }
-
-        return usernames;
+    function getUserView(address user) public view returns (UserView) {
+        return UserView({
+            addr: user,
+            username: usernameByUser[user]
+        });
     }
 
-    function likePost(uint postId) public {
+    function getUsersFromAddresses(address[] addresses) public view returns (UserView[]) {
+        UserView[] memory users = new UserView[](addresses.length);
+
+        for (uint i = 0; i < addresses.length; i++) {
+            users[i] = getUserView(addresses[i]);
+        }
+
+        return users;
+    }
+
+    function likePost(address user, uint postId) public onlyController(user) {
         require(postById[postId].id != 0, "Post does not exist.");
 
-        address user = msg.sender;
         uint[] memory likedPosts = likesByUser[user];
 
         for (uint i = 0; i < likedPosts.length; i++) {
@@ -197,10 +273,9 @@ contract MainContract {
         emit PostLiked(user, postId);
     }
 
-    function unlikePost(uint postId) public {
+    function unlikePost(address user, uint postId) public onlyController(user) {
         require(postById[postId].id != 0, "Post does not exist.");
 
-        address user = msg.sender;
         address[] memory postLikes = likesByPostId[postId];
 
         for (uint i = 0; i < postLikes.length; i++) {
@@ -234,17 +309,12 @@ contract MainContract {
         return likesByUser[user];
     }
 
-    function getPostLikeUsernames(uint postId) public view returns (string[]) {
-        return getUsernamesFromUsers(likesByPostId[postId]);
-    }
-
     uint public tipMinimumAmount = 0.1 ether;
 
-    function tipPost(uint postId) public payable {
+    function tipPost(address fromUser, uint postId) public payable onlyController(fromUser) {
         Post memory post = postById[postId];
         require(post.id != 0, "Post does not exist.");
 
-        address fromUser = msg.sender;
         address toUser = post.user;
 
         require(msg.value >= tipMinimumAmount, "Tip amount too small.");
@@ -262,6 +332,15 @@ contract MainContract {
         toUser.transfer(msg.value);
 
         emit PostTipped(fromUser, toUser, postId, msg.value);
+    }
+
+    function tipToTipView(Tip tip) public view returns (TipView) {
+        return TipView({
+            fromUser: getUserView(tip.fromUser),
+            toUser: getUserView(tip.toUser),
+            forPost: tip.forPost,
+            amount: tip.amount
+        });
     }
 
     function getTipsByPostId(uint postId) public view returns (Tip[]) {
