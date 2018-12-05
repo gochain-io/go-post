@@ -48,7 +48,7 @@ export const initContracts = () => async dispatch => {
       web3.setProvider(window.web3.currentProvider);
       networkId = await web3.eth.net.getId();
     } else {
-      if (process.env.NODE_ENV !== 'development') {
+      if (process.env.NODE_ENV === 'development') {
         // In development, fall back to ganache-cli.
         web3.setProvider('ws://localhost:8545');
         networkId = await web3.eth.net.getId();
@@ -102,7 +102,7 @@ export const initContracts = () => async dispatch => {
       return;
     }
 
-    let lastBlockNum = null;
+    let lastBlockNum = 0;
     setInterval(() => {
       web3Direct.eth.getBlockNumber((e, res) => {
         if (e) {
@@ -110,7 +110,7 @@ export const initContracts = () => async dispatch => {
           dispatch(web3Error(errorType.DISCONNECTED, e));
         }
 
-        if (lastBlockNum !== res) {
+        if (lastBlockNum < res) {
           lastBlockNum = res;
           console.log('new block', res);
           dispatch(setLastBlockTime(new Date()));
@@ -118,7 +118,12 @@ export const initContracts = () => async dispatch => {
       });
     }, 1000);
 
-    dispatch(setMainContract(await getMainContract(web3, networkId)));
+    try {
+      dispatch(setMainContract(await getMainContract(web3, networkId)));
+    } catch (e) {
+      console.error('Error getting contract. Are contracts deployed to this network?');
+      throw e;
+    }
 
     dispatch(connected(web3, networkId, account));
     await dispatch(initMiniwallet());
