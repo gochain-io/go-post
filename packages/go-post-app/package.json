@@ -13,6 +13,7 @@
     "go-post-api": "file:../go-post-api",
     "i": "0.3.6",
     "informed": "1.10.9",
+    "ipfs-http-client": "29.0.0",
     "moment": "2.22.2",
     "react": "16.6.3",
     "react-dom": "16.6.3",

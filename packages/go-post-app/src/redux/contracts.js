@@ -1,5 +1,6 @@
 // @flow
 
+import ipfsClient from 'ipfs-http-client';
 import { createActions, handleActions } from 'redux-actions';
 import Web3 from 'web3';
 
@@ -27,11 +28,12 @@ const defaultState = {
   contracts: {
     main: null,
   },
+  ipfs: null,
   lastBlockTime: new Date(),
 };
 
 const { connected, web3Error, setMainContract, setLastBlockTime } = createActions({
-  CONNECTED: (web3, networkId, account) => ({ web3, networkId, account }),
+  CONNECTED: (web3, networkId, account, ipfs) => ({ web3, networkId, account, ipfs }),
   WEB3_ERROR: (errorType, error) => ({ errorType, error }),
   SET_MAIN_CONTRACT: (contract) => ({ contract }),
   SET_LAST_BLOCK_TIME: (lastBlockTime) => ({ lastBlockTime }),
@@ -39,6 +41,12 @@ const { connected, web3Error, setMainContract, setLastBlockTime } = createAction
 
 const web3 = new Web3();
 const web3Direct = new Web3(); // Not through MetaMask
+
+const makeIPFSClient = () => {
+  const ipfsHost = process.env.REACT_APP_IPFS_HOST || 'localhost';
+  const ipfsPort = process.env.REACT_APP_IPFS_PORT || '5001';
+  return ipfsClient(ipfsHost, ipfsPort);
+};
 
 export const initContracts = () => async dispatch => {
   try {
@@ -125,7 +133,7 @@ export const initContracts = () => async dispatch => {
       throw e;
     }
 
-    dispatch(connected(web3, networkId, account));
+    dispatch(connected(web3, networkId, account, makeIPFSClient()));
     await dispatch(initMiniwallet());
     await dispatch(initProfile());
   } catch (e) {
@@ -136,12 +144,13 @@ export const initContracts = () => async dispatch => {
 
 const reducer = handleActions(
   {
-    [connected]: (state, { payload: { web3, networkId, account } }) => ({
+    [connected]: (state, { payload: { web3, networkId, account, ipfs } }) => ({
       ...state,
       isConnected: true,
       web3,
       networkId,
-      account
+      account,
+      ipfs
     }),
     [web3Error]: (state, { payload: { errorType, error  } }) => ({
       ...defaultState,

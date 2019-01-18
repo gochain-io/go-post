@@ -31,14 +31,14 @@ contract MainContract {
         uint id;
         address user;
         uint time;
-        string content;
+        string ipfsPath;
     }
 
     struct PostView {
         uint id;
         UserView user;
         uint time;
-        string content;
+        string ipfsPath;
         UserView[] likes;
         TipView[] tips;
     }
@@ -140,20 +140,20 @@ contract MainContract {
             id: post.id,
             user: getUserView(post.user),
             time: post.time,
-            content: post.content,
+            ipfsPath: post.ipfsPath,
             likes: likes,
             tips: tips
         });
     }
 
-    function makePost(address user, string _content) public onlyController(user) {
+    function makePost(address user, string _ipfsPath) public onlyController(user) {
         uint id = makePostId();
         Post memory post = Post({
             id: id,
             user: user,
             /*solium-disable-next-line security/no-block-members*/
             time: block.timestamp,
-            content: _content
+            ipfsPath: _ipfsPath
         });
 
         postById[id] = post;

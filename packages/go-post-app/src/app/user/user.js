@@ -35,9 +35,37 @@ const processNewPost = post => ({
   tipPending: false,
 });
 
+const fillPostContents = async (ipfs, posts) => {
+  const ipfsPaths = posts.map(post => post.ipfsPath);
+  let contents = ipfsPaths.map(path => ipfs.get(path).then(
+      result => result[0].content.toString('utf8'),
+      err => {
+        console.error('Failed to fetch post with path', path, err);
+        // Replace content we couldn't fetch with null.
+        return null;
+      }
+  ));
+
+  return Array.from((await Promise.all(contents))
+    // Convert to [index, content] pairs.
+    .entries())
+    // Filter out items with null content.
+    .filter(([i, content]) => content !== null)
+    // For the content that we successfully fetched, insert into a copy of the corresponding post.
+    .map(([i, content]) => ({
+      ...posts[i],
+      content,
+    }));
+};
+
+const fillPostContent = async (ipfs, post) => {
+  const [filledPost] = await fillPostContents(ipfs, [post]);
+  return typeof filledPost !== 'undefined' ? filledPost : null;
+};
+
 export const fetchPosts = (user) => async (dispatch, getState) => {
   try {
-    const { account, contracts: { main } } = getState().contracts;
+    const { account, contracts: { main }, ipfs } = getState().contracts;
     await dispatch(unsubscribeToPosts());
 
     let userAddress = null;
@@ -55,6 +83,7 @@ export const fetchPosts = (user) => async (dispatch, getState) => {
       await dispatch(subscribeToPosts(userAddress));
 
       let posts = await main.methods.getPostsByUser(userAddress).call();
+      posts = await fillPostContents(ipfs, posts);
       posts = posts.map(processNewPost);
       dispatch(fetched(user, userAddress, posts));
     } else {
@@ -70,7 +99,7 @@ let postsListener = null;
 
 const subscribeToPosts = (user) => async (dispatch, getState) => {
   try {
-    const main = getState().contracts.contracts.main;
+    const { contracts: { main }, ipfs } = getState().contracts;
 
     postsListener = main.events.NewPost({
       filter: { user },
@@ -80,7 +109,13 @@ const subscribeToPosts = (user) => async (dispatch, getState) => {
         return;
       }
 
-      dispatch(addPost(processNewPost(event.returnValues.post)));
+      fillPostContent(ipfs, event.returnValues.post).then(post => {
+        if (post !== null) {
+          dispatch(addPost(processNewPost(post)));
+        }
+      }, e => {
+        console.error('Post subscribe error', e);
+      });
     });
   } catch (e) {
     console.error('Post subscribe error', e);
@@ -95,12 +130,15 @@ export const unsubscribeToPosts = () => async (dispatch, getState) => {
 }
 
 export const makePost = (content) => async (dispatch, getState) => {
-  const { account, contracts: { main } } = getState().contracts;
+  const { account, contracts: { main }, ipfs } = getState().contracts;
 
   try {
     dispatch(setIsPosting(true));
-    const result = await dispatch(sendTransaction(main.methods.makePost(account, content), { gas: 3e6 }));
-    dispatch(addPost(processNewPost(result.events.NewPost.returnValues.post)));
+    const [{ path: ipfsPath }] = await ipfs.add(ipfs.types.Buffer.from(content));
+    const result = await dispatch(sendTransaction(main.methods.makePost(account, ipfsPath), { gas: 3e6 }));
+    const { post } = result.events.NewPost.returnValues;
+    post.content = content;
+    dispatch(addPost(processNewPost(post)));
   } catch(e) {
     console.error('error saving post', e);
   } finally {
