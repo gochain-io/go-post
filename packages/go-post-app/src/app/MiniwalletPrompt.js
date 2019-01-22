@@ -1,32 +1,12 @@
 import BN from 'bn.js';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { Avatar, Button, Grid, Paper, Typography, withStyles } from '@material-ui/core';
+import { Button, Grid, Typography, withStyles } from '@material-ui/core';
 import Restore from '@material-ui/icons/Restore';
 import { hideMiniwalletPrompt } from '../redux/miniwallet';
+import SimplePrompt from '../components/SimplePrompt';
 
 const styles = theme => ({
-  page: {
-    marginTop: theme.spacing.unit * 4,
-    [theme.breakpoints.up(450 + theme.spacing.unit * 3 * 2)]: {
-      width: 450,
-      marginLeft: 'auto',
-      marginRight: 'auto',
-    },
-  },
-  paper: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: `${theme.spacing.unit * 4}px`,
-  },
-  avatar: {
-    margin: theme.spacing.unit,
-    backgroundColor: theme.palette.secondary.main,
-  },
-  title: {
-    marginBottom: theme.spacing.unit * 2,
-  },
   subtitle: {
     lineHeight: 1.5,
   },
@@ -66,26 +46,18 @@ class MiniwalletPrompt extends Component {
 
     if (isPromptVisible) {
       return (
-        <Grid container justify="center" alignItems="stretch" direction="column" className={classes.page}>
-          <Paper className={classes.paper}>
-            <Avatar className={classes.avatar}>
-              <Restore />
-            </Avatar>
-            <Typography component="h1" variant="h5" className={classes.title}>
-              {title}
-            </Typography>
-            <Typography variant="body2" color="inherit" paragraph className={classes.subtitle}>
-              {subtitle}
-            </Typography>
-            <Grid container justify="center">
-              <Grid item>
-                <Button variant="contained" color="primary" className={classes.button} onClick={props.hideMiniwalletPrompt}>
-                  {buttonTitle}
-                </Button>
-              </Grid>
+        <SimplePrompt avatar={<Restore />} title={title}>
+          <Typography variant="body2" color="inherit" paragraph className={classes.subtitle}>
+            {subtitle}
+          </Typography>
+          <Grid container justify="center">
+            <Grid item>
+              <Button variant="contained" color="primary" className={classes.button} onClick={props.hideMiniwalletPrompt}>
+                {buttonTitle}
+              </Button>
             </Grid>
-          </Paper>
-        </Grid>
+          </Grid>
+        </SimplePrompt>
       );
     } else {
       return props.children;
@@ -93,4 +65,7 @@ class MiniwalletPrompt extends Component {
   }
 }
 
-export default withStyles(styles)(connect(mapStateToProps, mapDispatchToProps)(MiniwalletPrompt));
+const MiniwalletPromptStyled = withStyles(styles)(MiniwalletPrompt);
+export { MiniwalletPromptStyled as MiniwalletPromptUnconnected };
+
+export default connect(mapStateToProps, mapDispatchToProps)(MiniwalletPromptStyled);

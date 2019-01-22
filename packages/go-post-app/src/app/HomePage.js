@@ -1,4 +1,3 @@
-import BN from 'bn.js';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { Redirect } from 'react-router';
@@ -18,8 +17,6 @@ class HomePage extends Component {
 
   render() {
     const { props } = this;
-    const { classes } = props;
-
     const user = props.username || props.parentAccount;
 
     return props.profileIsFetched

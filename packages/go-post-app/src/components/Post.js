@@ -10,7 +10,6 @@ import Avatar from '@material-ui/core/Avatar';
 import IconButton from '@material-ui/core/IconButton';
 import Typography from '@material-ui/core/Typography';
 import FavoriteIcon from '@material-ui/icons/Favorite';
-import MoreVertIcon from '@material-ui/icons/MoreVert';
 import CardGiftcard from '@material-ui/icons/CardGiftcard'
 import Web3 from 'web3';
 
@@ -21,25 +20,8 @@ const styles = theme => ({
   card: {
     marginBottom: theme.spacing.unit * 2,
   },
-  media: {
-    height: 0,
-    paddingTop: '56.25%', // 16:9
-  },
   actions: {
     display: 'flex',
-  },
-  expand: {
-    transform: 'rotate(0deg)',
-    transition: theme.transitions.create('transform', {
-      duration: theme.transitions.duration.shortest,
-    }),
-    marginLeft: 'auto',
-    [theme.breakpoints.up('sm')]: {
-      marginRight: -8,
-    },
-  },
-  expandOpen: {
-    transform: 'rotate(180deg)',
   },
   avatar: {
     backgroundColor: theme.palette.secondary.main,
@@ -91,11 +73,6 @@ class Post extends Component {
               {firstLetter(user)}
             </Avatar>
           }
-          // action={
-          //   <IconButton>
-          //     <MoreVertIcon />
-          //   </IconButton>
-          // }
           title={(
             <Link to={`/users/${user}`} className={classes.link}>
               {formatUser(user)}

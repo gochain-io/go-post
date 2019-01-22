@@ -4,11 +4,16 @@ import { createActions, handleActions } from 'redux-actions';
 import { MiniwalletArtifact } from 'go-post-api';
 
 // These numbers aren't particularly fined-tuned.
+// When recharged, the miniwallet is filled to this balance.
 const walletBalanceRecommended = new BN(10).pow(new BN(18)).mul(new BN(3));
+// The user is asked to recharge the miniwallet when its balance drops below this.
 const walletBalanceLow = new BN(10).pow(new BN(18));
+// When recharged, the child account is filled to this balance.
 const accountBalanceRecommended = new BN(10).pow(new BN(17));
-// Must be more than the greatest amount required by a miniwallet transaction.
+// Enough for a few transactions
 const accountBalanceLow = new BN(10).pow(new BN(16).mul(new BN(4)));
+// If the child account balance somehow falls below this, it cannot withdraw from the miniwallet and a MetaMask.
+// transaction must be triggered instead.
 const accountBalanceVeryLow = new BN(10).pow(new BN(16));
 
 const defaultState = {
@@ -75,6 +80,9 @@ export const refreshContract = (contract) => async (dispatch, getState) => {
   const walletBalance = web3.utils.toBN(await web3.eth.getBalance(contract.options.address));
   dispatch(updateContract(contract, walletBalance));
 
+  // Ignore the child account if it's not associated with the miniwallet. This will happen if it is new (after the user
+  // clears their browser data). The user will be asked to "reactivate" the wallet (via the recharge function) which
+  // tops it off and adds the new child account as an owner.
   if (await isOwnerInContract(contract, childAccount)) {
     const accountBalance = web3.utils.toBN(await web3.eth.getBalance(childAccount));
     dispatch(setAccount(childAccount));
@@ -105,6 +113,7 @@ export const recharge = () => async (dispatch, getState) => {
       contract = new web3.eth.Contract(MiniwalletArtifact.abi, result.events.NewMiniwallet.returnValues.wallet);
     }
 
+    // Fill the miniwallet to the recommended level and add the child account as an owner if it is not.
     await contract.methods.recharge(childAccount, amountForChild.toString()).send({
       from: parentAccount,
       gas: 1e7,
@@ -186,10 +195,12 @@ export const getShouldRecharge = (state) => {
     miniwallet: {
       contract,
       cachedWalletBalance,
-      cachedAccountBalance
-    }
+      cachedAccountBalance,
+    },
   } = state;
 
+  // Should recharge the wallet if its balance is low or the child account's balance is so low that it can't withdraw
+  // from the miniwallet.
   return !contract || cachedWalletBalance.lt(walletBalanceLow) || cachedAccountBalance.lt(accountBalanceVeryLow);
 }
 
@@ -222,6 +233,10 @@ const cancelPendingTransactions = (err) => async (dispatch, getState) => {
   }
 }
 
+/**
+ * Execute all pending transactions for the child account one by one, recharging from the miniwallet and prompting the
+ * user to recharge the miniwallet as needed.
+ */
 const flushPendingTransactions = () => async (dispatch, getState) => {
   const { web3 } = getState().contracts;
 
@@ -237,12 +252,15 @@ const flushPendingTransactions = () => async (dispatch, getState) => {
       }
 
       if (getIsWalletBalanceLow(getState())) {
+        // Prompt the user to recharge the miniwallet.
         dispatch(setPromptVisible(true));
+        // When the prompt is hidden we will re-enter this function. Keep isFlushingTransactions on to prevent double-running.
         return;
       }
 
       const { transactionObject, sendOptions, resolve, reject } = pending[0];
       dispatch(popPendingTransaction());
+      // If necessary, transfer enough funds from the miniwallet to the child account to execute a few transactions.
       await dispatch(ensureBuffer());
 
       try {
@@ -253,6 +271,7 @@ const flushPendingTransactions = () => async (dispatch, getState) => {
           web3.eth.getBalance(contract.options.address),
           web3.eth.getBalance(account),
         ])).map(num => web3.utils.toBN(num));
+        // Update the balances of the miniwallet and the child account.
         dispatch(setWalletBalance(walletBalance));
         dispatch(setAccountBalance(accountBalance));
 
@@ -279,8 +298,6 @@ export const sendMiddleware = store => next => action => {
     case 'app/miniwallet/SEND_TRANSACTION':
       return (async () => {
         const { web3, account: parentAccount } = store.getState().contracts;
-        const state = store.getState().miniwallet;
-
         const { transactionObject } = action.payload;
         const childAccount = ensureChildAccount(web3, parentAccount);
         const sendOptions = {
@@ -292,9 +309,7 @@ export const sendMiddleware = store => next => action => {
           try {
             store.dispatch(addPendingTransaction(transactionObject, sendOptions, resolve, reject));
 
-            const {
-              isFlushingTransactions,
-            } = store.getState().miniwallet;
+            const { isFlushingTransactions } = store.getState().miniwallet;
 
             if (isFlushingTransactions) {
               return;

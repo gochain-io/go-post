@@ -1,31 +1,10 @@
 import React, { Component } from 'react';
-import { Avatar, Grid, Paper, Typography, withStyles } from '@material-ui/core';
+import { Typography, withStyles } from '@material-ui/core';
 import LockIcon from '@material-ui/icons/LockOutlined';
 import { errorType } from '../redux/contracts';
+import SimplePrompt from '../components/SimplePrompt';
 
 const styles = theme => ({
-  page: {
-    marginTop: theme.spacing.unit * 4,
-    [theme.breakpoints.up(450 + theme.spacing.unit * 3 * 2)]: {
-      width: 450,
-      marginLeft: 'auto',
-      marginRight: 'auto',
-    },
-  },
-  paper: {
-    marginTop: theme.spacing.unit * 4,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: `${theme.spacing.unit * 4}px`,
-  },
-  avatar: {
-    margin: theme.spacing.unit,
-    backgroundColor: theme.palette.secondary.main,
-  },
-  title: {
-    marginBottom: theme.spacing.unit * 2,
-  },
   subtitle: {
     lineHeight: 1.5,
   },
@@ -54,19 +33,11 @@ class MetaMaskPrompt extends Component {
     }
 
     return (
-      <Grid container justify="center" alignItems="stretch" direction="column" className={classes.page}>
-        <Paper className={classes.paper}>
-          <Avatar className={classes.avatar}>
-            <LockIcon />
-          </Avatar>
-          <Typography component="h1" variant="h5" className={classes.title}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="inherit" paragraph className={classes.subtitle}>
-            {subtitle}
-          </Typography>
-        </Paper>
-      </Grid>
+      <SimplePrompt avatar={<LockIcon />} title={title}>
+        <Typography variant="body2" color="inherit" paragraph className={classes.subtitle}>
+          {subtitle}
+        </Typography>
+      </SimplePrompt>
     );
   }
 }

@@ -1,37 +1,16 @@
-import BN from 'bn.js';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { Redirect } from 'react-router';
-import { Avatar, Button, Grid, Paper, TextField, Typography, withStyles } from '@material-ui/core';
+import { Button, Grid, TextField, withStyles } from '@material-ui/core';
 import Person from '@material-ui/icons/Person';
 import { saveUsername, setDidSetUsername } from './profile';
 import MiniwalletPrompt from '../MiniwalletPrompt';
 import BlockTimeIndicator from '../../components/BlockTimeIndicator';
 import TopBar from '../TopBar';
 
+import SimplePrompt from '../../components/SimplePrompt';
+
 const styles = theme => ({
-  page: {
-    marginTop: theme.spacing.unit * 4,
-    [theme.breakpoints.up(450 + theme.spacing.unit * 3 * 2)]: {
-      width: 450,
-      marginLeft: 'auto',
-      marginRight: 'auto',
-    },
-  },
-  paper: {
-    marginTop: theme.spacing.unit * 4,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: `${theme.spacing.unit * 4}px`,
-  },
-  avatar: {
-    margin: theme.spacing.unit,
-    backgroundColor: theme.palette.secondary.main,
-  },
-  title: {
-    marginBottom: theme.spacing.unit * 2,
-  },
   button: {
     marginTop: theme.spacing.unit * 2,
   },
@@ -53,6 +32,10 @@ const mapDispatchToProps = {
 };
 
 class SetUsernamePage extends Component {
+  state = {
+    submitError: null,
+  };
+
   onSubmit = event => {
     event.preventDefault();
     const { value } = this.input;
@@ -62,7 +45,7 @@ class SetUsernamePage extends Component {
     }
 
     if (trimmed.length < 4 || trimmed.length > 15) {
-      alert('Username must be between 4 and 15 characters long.'); // TODO: Show error properly.
+      this.setState({ submitError: 'Username must be between 4 and 15 characters long.' });
       return;
     }
 
@@ -89,19 +72,15 @@ class SetUsernamePage extends Component {
         <TopBar />
         <Grid container justify="center" alignItems="stretch" direction="column" className={classes.page}>
           <MiniwalletPrompt>
-            <Paper className={classes.paper}>
-              <Avatar className={classes.avatar}>
-                <Person />
-              </Avatar>
-              <Typography component="h1" variant="h5" className={classes.title}>
-                Set Your Username
-              </Typography>
+            <SimplePrompt avatar={<Person />} title='Set Your Username'>
               <form onSubmit={this.onSubmit}>
                 <TextField
                   required
                   fullWidth
                   type="text"
                   placeholder="Username"
+                  error={!!this.state.submitError}
+                  helperText={this.state.submitError}
                   className={classes.textField}
                   inputRef={ref => (this.input = ref)}
                 />
@@ -115,7 +94,7 @@ class SetUsernamePage extends Component {
                   </Grid>
                 </Grid>
               </form>
-            </Paper>
+            </SimplePrompt>
           </MiniwalletPrompt>
         </Grid>
       </>

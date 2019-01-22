@@ -1,6 +1,5 @@
 // @flow
 
-import classnames from 'classnames';
 import { Grid, Typography, withStyles, CircularProgress } from '@material-ui/core';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -21,7 +20,6 @@ import TipPrompt from './TipPrompt';
 import Post from '../../components/Post';
 import { userViewToString } from '../../format';
 import PostInput from './PostInput';
-import { hideMiniwalletPrompt } from '../../redux/miniwallet';
 import MiniwalletPrompt from '../MiniwalletPrompt';
 import { saveUsername } from '../profile/profile';
 import TopBar from '../TopBar';

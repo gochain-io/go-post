@@ -27,7 +27,7 @@ contract('MainContract', accounts => {
       const userPosts = await instance.methods.getPostIdsByUser(accounts[0]).call();
       assert.deepEqual(userPosts, ['1']);
       const post = await instance.methods.postById(userPosts[0]).call();
-      assert.equal(post.content, 'Test message');
+      assert.equal(post.ipfsPath, 'Test message');
     });
 
     it('should increment post IDs', async () => {

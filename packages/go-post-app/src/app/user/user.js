@@ -1,6 +1,5 @@
 // @flow
 
-import BN from 'bn.js';
 import { createActions, handleActions } from 'redux-actions';
 import Web3 from 'web3';
 import { sendTransaction } from '../../redux/miniwallet';
@@ -13,9 +12,22 @@ const defaultState = {
   posts: null,
   tippingPostId: null,
   isPosting: false,
+  parentAccountBalance: null,
 };
 
-const { fetched, addPost, fail, setLikePending, setLiked, startTip, closeTipPrompt, setTipPending, addTip, setIsPosting } = createActions({
+const {
+  fetched,
+  addPost,
+  fail,
+  setLikePending,
+  setLiked,
+  startTip,
+  closeTipPrompt,
+  setTipPending,
+  addTip,
+  setIsPosting,
+  setParentAccountBalance,
+} = createActions({
   FETCHED: (user, userAddress, posts) => ({ user, userAddress, posts }),
   ADD_POST: (post) => ({ post }),
   FAIL: (error) => ({ error }),
@@ -26,6 +38,7 @@ const { fetched, addPost, fail, setLikePending, setLiked, startTip, closeTipProm
   SET_TIP_PENDING: (postId, tipPending) => ({ postId, tipPending }),
   ADD_TIP: (postId, tip) => ({ postId, tip }),
   SET_IS_POSTING: (isPosting) => ({ isPosting }),
+  SET_PARENT_ACCOUNT_BALANCE: (parentAccountBalance) => ({ parentAccountBalance }),
 }, { prefix: 'app/user' });
 export { startTip, closeTipPrompt };
 
@@ -65,7 +78,7 @@ const fillPostContent = async (ipfs, post) => {
 
 export const fetchPosts = (user) => async (dispatch, getState) => {
   try {
-    const { account, contracts: { main }, ipfs } = getState().contracts;
+    const { contracts: { main }, ipfs } = getState().contracts;
     await dispatch(unsubscribeToPosts());
 
     let userAddress = null;
@@ -220,7 +233,7 @@ export const tip = (postId, amount) => async (dispatch, getState) => {
     }
 
     // We send from parentAccount since the miniwallet account won't have enough funds for tipping.
-    const result = await main.methods.tipPost(parentAccount, post.post.id).send({
+    await main.methods.tipPost(parentAccount, post.post.id).send({
       from: parentAccount,
       value: tip.amount.toString(),
       gas: 1e6
@@ -263,6 +276,17 @@ const ensureLike = (likes, account, liked) => {
     }
   } else {
     return likes.filter(like => like.addr !== account);
+  }
+};
+
+export const fetchParentAccountBalance = () => async (dispatch, getState) => {
+  const { account: parentAccount, web3 } = getState().contracts;
+
+  try {
+    const balance = web3.utils.toBN(await web3.eth.getBalance(parentAccount));
+    dispatch(setParentAccountBalance(balance));
+  } catch (e) {
+    console.error('Failed to fetch parent account balance.', e);
   }
 };
 
@@ -345,6 +369,7 @@ const reducer = handleActions(
       };
     },
     [setIsPosting]: (state,  { payload: { isPosting } }) => ({ ...state, isPosting }),
+    [setParentAccountBalance]: (state, { payload: { parentAccountBalance } }) => ({ ...state, parentAccountBalance }),
   },
   defaultState
 );

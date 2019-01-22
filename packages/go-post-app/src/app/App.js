@@ -2,9 +2,7 @@
 
 import { CssBaseline, Grid, withStyles, CircularProgress } from '@material-ui/core';
 import blue from '@material-ui/core/colors/blue';
-import pink from '@material-ui/core/colors/pink';
 import red from '@material-ui/core/colors/red';
-import { darken } from '@material-ui/core/styles/colorManipulator';
 import { MuiThemeProvider, createMuiTheme } from '@material-ui/core/styles';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -15,7 +13,6 @@ import './App.css';
 import HomePage from './HomePage';
 import UserPage from './user/UserPage';
 import SetUsernamePage from './profile/SetUsernamePage';
-import TopBar from './TopBar';
 import { initContracts } from '../redux/contracts';
 import MetaMaskPrompt from './MetaMaskPrompt';
 
@@ -36,9 +33,7 @@ const theme = createMuiTheme({
   palette: {
     primary: blue,
     secondary: {
-      // Darken so we reach the AA contrast ratio level.
       main: red[500],
-      // main: darken(pink.A400, 0.08),
     },
   },
   typography: {

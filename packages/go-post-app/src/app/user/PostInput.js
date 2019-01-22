@@ -7,7 +7,6 @@ const styles = theme => ({
     padding: theme.spacing.unit * 2,
     marginBottom: theme.spacing.unit * 2,
   },
-  input: {},
   button: {
     marginTop: theme.spacing.unit,
   },
@@ -46,7 +45,6 @@ class PostInput extends React.Component {
             rows={2}
             placeholder="What's on your mind?"
             inputRef={input => { this.input = input; }}
-            className={classes.input}
           />
           <Grid container justify="flex-end">
             <Grid item>
