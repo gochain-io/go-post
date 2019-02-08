@@ -13,29 +13,37 @@ go-post-app stores and retrieves message content using IPFS, while everything el
 ## Setup
 
 ```sh
-$ git clone https://github.com/AdamDanielKing/go-post
-$ cd go-post
-$ npm run bootstrap
+git clone https://github.com/go-chain/go-post
+cd go-post
+npm install
+npm run bootstrap
 ```
 
 This will install the dependencies of both projects.
 
 ## Developing and running locally
 
+In terminal 1:
+
 ```sh
-$ cd packages/go-post-api
-# Start a ganache-cli instance, which simulates the GoChain network.
-$ npm run ganache-cli
+# Start a local GoChain instance (this runs in the background)
+docker run --name local_node -p 8545:8545 -d gochain/gochain gochain --local
 
-# In another terminal, deploy the smart contracts.
-$ npm run migrate:local
-
-# In another terminal, navigate to go-post-app and run it.
-$ cd packages/go-post-app
-$ npm run start
+# Deploy contracts
+cd packages/go-post-api
+npm run migrate:local
 ```
 
-During development MetaMask must be disabled (or not installed) in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses ganache-cli. In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
+In terminal 2:
+
+```sh
+# In another terminal, navigate to go-post-app and run it.
+cd packages/go-post-app
+npm run start
+```
+
+During development MetaMask must be disabled (or not installed) in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses your
+local GoChain instance. In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
 
 go-post-api has a test suite that can be run with `npm run test` from `packages/go-post-api`.
 
@@ -44,18 +52,18 @@ go-post-api has a test suite that can be run with `npm run test` from `packages/
 To run the application on the GoChain test network or main network, first deploy the smart contracts.
 
 ```sh
-$ cd packages/go-post-api
+cd packages/go-post-api
 # Deploy to the GoChain test network.
-$ npm run migrate:test
+npm run migrate:test
 # Deploy to the GoChain main network.
-$ npm run migrate:main
+npm run migrate:main
 ```
 
 Then create a production build of go-post-app.
 
 ```sh
-$ cd packages/go-post-app
-$ npm run build
+cd packages/go-post-app
+npm run build
 ```
 
 This build can connect to different networks (test network, main network) depending on what you select in MetaMask.

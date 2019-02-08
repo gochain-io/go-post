@@ -58,7 +58,7 @@ export const initContracts = () => async dispatch => {
     } else {
       if (process.env.NODE_ENV === 'development') {
         // In development, fall back to ganache-cli.
-        web3.setProvider('ws://localhost:8545');
+        web3.setProvider(new Web3.providers.HttpProvider('http://localhost:8545'));
         networkId = await web3.eth.net.getId();
       } else {
         // No MetaMask, not developing.

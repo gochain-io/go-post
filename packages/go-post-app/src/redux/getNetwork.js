@@ -12,6 +12,6 @@ export default (networkId) => ({
   },
   local: {
     name: 'Localhost',
-    url: 'ws://localhost:8545'
+    url: 'http://localhost:8545'
   }
 }[networkId]);
