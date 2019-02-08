@@ -1,6 +1,6 @@
 # Go Post
 
-Go Post is an example project showing how to make a decentralized application on GoChain. Similar to Twitter, it allows users to post and like messages. Unlike Twitter, users can tip each other for posts by sending GO.
+Go Post is an example project showing how to make a decentralized application on [GoChain](https://gochain.io/). Similar to Twitter, it allows users to post and like messages. Unlike Twitter, users can tip each other for posts by sending GO.
 
 Go Post also demonstrates a new method to make decentralized applications more convenient by not requiring every user action to be signed using MetaMask. See [Miniwallet](#Miniwallet) below.
 
@@ -13,7 +13,7 @@ go-post-app stores and retrieves message content using IPFS, while everything el
 ## Setup
 
 ```sh
-$ git clone https://github.com/Adam0000/go-post
+$ git clone https://github.com/AdamDanielKing/go-post
 $ cd go-post
 $ npm run bootstrap
 ```
