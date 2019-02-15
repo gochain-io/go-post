@@ -51,6 +51,7 @@ const makeIPFSClient = () => {
 export const initContracts = () => async dispatch => {
   try {
     let networkId = null;
+    let isLocalNode = false;
 
     if (typeof window.web3 !== 'undefined') { // MetaMask
       web3.setProvider(window.web3.currentProvider);
@@ -59,6 +60,7 @@ export const initContracts = () => async dispatch => {
       if (process.env.NODE_ENV === 'development') {
         // In development, fall back to local GoChain node.
         web3.setProvider(getNetwork('local').url);
+        isLocalNode = true;
         networkId = await web3.eth.net.getId();
       } else {
         // No MetaMask, not developing.
@@ -72,7 +74,7 @@ export const initContracts = () => async dispatch => {
       return;
     }
 
-    let network = networkId > 1000 ? getNetwork('local') : getNetwork(networkId);
+    let network = isLocalNode ? getNetwork('local') : getNetwork(networkId);
 
     if (!network) {
       dispatch(web3Error(errorType.NETWORK, new Error('web3 error')));
