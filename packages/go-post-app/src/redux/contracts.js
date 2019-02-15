@@ -23,7 +23,7 @@ const defaultState = {
   error: null,
   web3: null,
   web3Direct: null,
-  networkId: null,
+  network: null,
   account: null,
   contracts: {
     main: null,
@@ -33,7 +33,7 @@ const defaultState = {
 };
 
 const { connected, web3Error, setMainContract, setLastBlockTime } = createActions({
-  CONNECTED: (web3, networkId, account, ipfs) => ({ web3, networkId, account, ipfs }),
+  CONNECTED: (web3, network, account, ipfs) => ({ web3, network, account, ipfs }),
   WEB3_ERROR: (errorType, error) => ({ errorType, error }),
   SET_MAIN_CONTRACT: (contract) => ({ contract }),
   SET_LAST_BLOCK_TIME: (lastBlockTime) => ({ lastBlockTime }),
@@ -57,8 +57,8 @@ export const initContracts = () => async dispatch => {
       networkId = await web3.eth.net.getId();
     } else {
       if (process.env.NODE_ENV === 'development') {
-        // In development, fall back to ganache-cli.
-        web3.setProvider(new Web3.providers.HttpProvider('http://localhost:8545'));
+        // In development, fall back to local GoChain node.
+        web3.setProvider(getNetwork('local').url);
         networkId = await web3.eth.net.getId();
       } else {
         // No MetaMask, not developing.
@@ -72,7 +72,7 @@ export const initContracts = () => async dispatch => {
       return;
     }
 
-    let network = networkId > 10000000 ? getNetwork('local') : getNetwork(networkId);
+    let network = networkId > 1000 ? getNetwork('local') : getNetwork(networkId);
 
     if (!network) {
       dispatch(web3Error(errorType.NETWORK, new Error('web3 error')));
@@ -133,7 +133,7 @@ export const initContracts = () => async dispatch => {
       throw e;
     }
 
-    dispatch(connected(web3, networkId, account, makeIPFSClient()));
+    dispatch(connected(web3, { ...network, id: networkId }, account, makeIPFSClient()));
     await dispatch(initMiniwallet());
     await dispatch(initProfile());
   } catch (e) {
@@ -144,11 +144,11 @@ export const initContracts = () => async dispatch => {
 
 const reducer = handleActions(
   {
-    [connected]: (state, { payload: { web3, networkId, account, ipfs } }) => ({
+    [connected]: (state, { payload: { web3, network, account, ipfs } }) => ({
       ...state,
       isConnected: true,
       web3,
-      networkId,
+      network,
       account,
       ipfs
     }),

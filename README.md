@@ -13,10 +13,10 @@ go-post-app stores and retrieves message content using IPFS, while everything el
 ## Setup
 
 ```sh
-git clone https://github.com/go-chain/go-post
-cd go-post
-npm install
-npm run bootstrap
+$ git clone https://github.com/go-chain/go-post
+$ cd go-post
+$ npm install
+$ npm run bootstrap
 ```
 
 This will install the dependencies of both projects.
@@ -27,20 +27,29 @@ In terminal 1:
 
 ```sh
 # Start a local GoChain instance (this runs in the background)
-docker run --name local_node -p 8545:8545 -d gochain/gochain gochain --local
+$ docker run --name local_node -p 8545:8545 -p 8546:8546 -d gochain/gochain gochain --local --rpccorsdomain "*"
 
 # Deploy contracts
-cd packages/go-post-api
-npm run migrate:local
+$ cd packages/go-post-api
+$ npm run migrate:local
+# Configure node IP if not localhost:
+# LOCAL_NODE_IP=192.168.99.100 npm run migrate:local
 ```
 
-In terminal 2:
+If you're using Docker Machine as on macOS then you'll need to set `LOCAL_NODE_IP` to the IP address of your Docker VM. See [`docker-machine ip`](https://docs.docker.com/machine/reference/ip/).
+
+In addition to the local GoChain node and deployed contracts, the app needs an [IPFS daemon](https://docs.ipfs.io/introduction/install/) to store posts on. By default it looks for one at http://localhost:5001 but this is configurable as shown below. In terminal 2:
 
 ```sh
 # In another terminal, navigate to go-post-app and run it.
-cd packages/go-post-app
-npm run start
+$ cd packages/go-post-app
+$ npm run start
+
+# Optional configuration:
+# REACT_APP_IPFS_HOST=... REACT_APP_IPFS_PORT=... REACT_APP_LOCAL_NODE_IP=192.168.99.100 npm run start
 ```
+
+Similar to deploying the contracts, you may need to set `REACT_APP_LOCAL_NODE_IP`.
 
 During development MetaMask must be disabled (or not installed) in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses your
 local GoChain instance. In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
@@ -54,10 +63,12 @@ To run the application on the GoChain test network or main network, first deploy
 ```sh
 cd packages/go-post-api
 # Deploy to the GoChain test network.
-npm run migrate:test
+WEB3_PRIVATE_KEY=... npm run migrate:test
 # Deploy to the GoChain main network.
-npm run migrate:main
+WEB3_PRIVATE_KEY=... npm run migrate:main
 ```
+
+`WEB3_PRIVATE_KEY` must be set to the private key of an account that has sufficient funds on the network you're deploying to.
 
 Then create a production build of go-post-app.
 

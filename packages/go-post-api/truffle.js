@@ -1,28 +1,31 @@
-const HDWalletProvider = require('truffle-hdwallet-provider');
+const PrivateKeyProvider = require("truffle-privatekey-provider");
 const Web3 = require('web3');
 
-const getDeployKey = () => {
-  const keyFile = require('./deploy-key.json');
-  return keyFile.mnemonic;
-};
+const getPrivateKey = () => {
+  let privateKey = process.env.WEB3_PRIVATE_KEY;
+  if (!privateKey) {
+    throw new Error('WEB3_PRIVATE_KEY environment variable must be set before deploying to external networks.');
+  }
+  return privateKey.replace('0x', '');
+}
+
+const localNodeIP = process.env.LOCAL_NODE_IP || '127.0.0.1';
 
 module.exports = {
   networks: {
     development: {
-      host: "127.0.0.1",
+      host: localNodeIP,
       port: 8545,
       network_id: "*" // Match any network id
     },
     test: {
-      // FIXME: Uses Ethereum's HD path.
-      provider: () => new HDWalletProvider(getDeployKey(), 'https://testnet-rpc.gochain.io'),
+      provider: () => new PrivateKeyProvider(getPrivateKey(), 'https://testnet-rpc.gochain.io'),
       network_id: "*", // Match any network id
       gas: 2e7,
       gasPrice: 4e9
     },
     main: {
-      // FIXME: Uses Ethereum's HD path.
-      provider: () => new HDWalletProvider(getDeployKey(), 'https://rpc.gochain.io'),
+      provider: () => new PrivateKeyProvider(getPrivateKey(), 'https://rpc.gochain.io'),
       network_id: "*", // Match any network id
       gas: 2e7,
       gasPrice: 4e9
