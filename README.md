@@ -10,6 +10,11 @@ Go Post includes two packages: go-post-app and go-post-api. go-post-app is a use
 
 go-post-app stores and retrieves message content using IPFS, while everything else goes on GoChain.
 
+## Before Getting Started
+During development MetaMask **must be disabled (or not installed)** in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses your local GoChain instance.
+
+In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
+
 ## Setup
 
 ```sh
@@ -28,7 +33,15 @@ In terminal 1:
 ```sh
 # Start a local GoChain instance (this runs in the background)
 $ docker run --name local_node -p 8545:8545 -p 8546:8546 -d gochain/gochain gochain --local --rpccorsdomain "*"
+```
+You will need to wait until your local node is fully running.  It may also be helpful to check the docker logs to see the accounts that are being created and pre-funded.  You will need one of the account keys to set before running the migration in the next step.
 
+```sh
+docker logs local_node
+```
+Once you see blocks being mined and the funded accounts you are ready to proceed.
+
+```sh
 # Deploy contracts
 $ cd packages/go-post-api
 $ npm run migrate:local
@@ -46,9 +59,6 @@ $ npm run start
 # Optional configuration:
 # REACT_APP_IPFS_HOST=... REACT_APP_IPFS_PORT=... REACT_APP_LOCAL_NODE_IP=192.168.99.100 npm run start
 ```
-
-During development MetaMask must be disabled (or not installed) in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses your
-local GoChain instance. In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
 
 go-post-api has a test suite that can be run with `npm run test` from `packages/go-post-api`.
 
@@ -92,3 +102,4 @@ But since the page stores the private key for the child account in local storage
 To solve this problem we instead load a small amount of funds into a smart contract (the "miniwallet") and only give the child account enough for a few transactions. The miniwallet lists the child account as one of its "owners", allowing that account to recharge _itself_. The miniwallet also lists the user's MetaMask account as an owner so that when they lose access to the child account they can still reactivate the miniwallet with a MetaMask transaction and reclaim the majority of deposited funds.
 
 When the miniwallet itself runs out another MetaMask transaction is needed to recharge it.
+
