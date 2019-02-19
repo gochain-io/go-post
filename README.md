@@ -10,7 +10,7 @@ Go Post includes two packages: go-post-app and go-post-api. go-post-app is a use
 
 go-post-app stores and retrieves message content using IPFS, while everything else goes on GoChain.
 
-## Before Getting Started
+## Before getting started
 During development MetaMask **must be disabled (or not installed)** in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses your local GoChain instance.
 
 In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
@@ -32,12 +32,12 @@ In terminal 1:
 
 ```sh
 # Start a local GoChain instance (this runs in the background)
-$ docker run --name local_node -p 8545:8545 -p 8546:8546 -d gochain/gochain gochain --local --rpccorsdomain "*"
+$ docker run --name gochain -p 8545:8545 -p 8546:8546 -d gochain/gochain gochain --local --rpccorsdomain "*"
 ```
 You will need to wait until your local node is fully running.  It may also be helpful to check the docker logs to see the accounts that are being created and pre-funded.  You will need one of the account keys to set before running the migration in the next step.
 
 ```sh
-docker logs local_node
+docker logs gochain
 ```
 Once you see blocks being mined and the funded accounts you are ready to proceed.
 
