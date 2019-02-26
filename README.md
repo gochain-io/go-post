@@ -11,6 +11,7 @@ Go Post includes two packages: go-post-app and go-post-api. go-post-app is a use
 go-post-app stores and retrieves message content using IPFS, while everything else goes on GoChain.
 
 ## Before getting started
+
 During development MetaMask **must be disabled (or not installed)** in your browser or go-post-app will attempt to find the smart contracts on whichever GoChain network your MetaMask is connected to. With MetaMask disabled, go-post-app uses your local GoChain instance.
 
 In either case go-post-app finds the smart contract addresses for the corresponding network by reading go-post-api's artifact files.
@@ -18,43 +19,60 @@ In either case go-post-app finds the smart contract addresses for the correspond
 ## Setup
 
 ```sh
-$ git clone https://github.com/go-chain/go-post
-$ cd go-post
-$ npm install
-$ npm run bootstrap
+git clone https://github.com/go-chain/go-post
+cd go-post
+npm install
+npm run bootstrap
 ```
 
 This will install the dependencies of both projects.
 
 ## Developing and running locally
 
-In terminal 1:
+### Start Blockchain
+
+Start local GoChain node:
 
 ```sh
 # Start a local GoChain instance (this runs in the background)
-$ docker run --name gochain -p 8545:8545 -p 8546:8546 -d gochain/gochain gochain --local --rpccorsdomain "*"
+docker run --name gochain -p 8545:8545 -p 8546:8546 -d gochain/gochain gochain --local --rpccorsdomain "*" --rpcaddr "0.0.0.0" --wsorigins "*" --rpcvhosts "*"
 ```
+
 You will need to wait until your local node is fully running.  It may also be helpful to check the docker logs to see the accounts that are being created and pre-funded.  You will need one of the account keys to set before running the migration in the next step.
 
 ```sh
-docker logs gochain
+docker logs -f gochain
 ```
+
 Once you see blocks being mined and the funded accounts you are ready to proceed.
+
+### Start IPFS
+
+In addition to the local GoChain node and deployed contracts, the app needs an [IPFS daemon](https://docs.ipfs.io/introduction/install) to store posts on. By default it looks for one at <http://localhost:5001> but this is configurable as shown below.
+
+Run IPFS:
+
+```sh
+ipfs daemon > ipfs.log &
+```
+
+### Deploy contracts
 
 ```sh
 # Deploy contracts
-$ cd packages/go-post-api
-$ npm run migrate:local
+cd packages/go-post-api
+npm run migrate:local
 # Configure node IP if not localhost:
 # LOCAL_NODE_IP=192.168.99.100 npm run migrate:local
 ```
 
-In addition to the local GoChain node and deployed contracts, the app needs an [IPFS daemon](https://docs.ipfs.io/introduction/install/) to store posts on. By default it looks for one at http://localhost:5001 but this is configurable as shown below. In terminal 2:
+### Run the app
+
+Now let's start the UI:
 
 ```sh
-# In another terminal, navigate to go-post-app and run it.
-$ cd packages/go-post-app
-$ npm run start
+cd ../go-post-app
+npm run start
 
 # Optional configuration:
 # REACT_APP_IPFS_HOST=... REACT_APP_IPFS_PORT=... REACT_APP_LOCAL_NODE_IP=192.168.99.100 npm run start
